@@ -1,4 +1,7 @@
+#!/usr/bin/python
+
 from bottle import Bottle, run
+import entities
 
 app = Bottle()
 
