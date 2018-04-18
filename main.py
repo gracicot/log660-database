@@ -6,6 +6,7 @@ import time
 from datetime import date
 from pony import orm
 import json
+import sqlite3
 
 app = Bottle()
 
@@ -98,5 +99,78 @@ def location():
 			]
 		}
 	})
+
+@orm.db_session
+def getFilmCorr(ids, rate):
+	films = orm.select(f for f in entities.Film)[:]
+	return json.JSONEncoder().encode({
+		'films': [
+			{
+				'titre': f.titre
+			} for f in films if f.id_film in ids
+		],
+		'rating': rate
+	})
+
+@app.post('/recommandation')
+def recommandation():
+	film = request.json['id_film']
+	client = request.json['id_client']
+	
+	conn = sqlite3.connect('./db/Labo2.db')
+	
+	conn.enable_load_extension(True)
+	conn.load_extension('./db/maths')
+	
+	c = conn.cursor()
+	
+	idfilm = [id[0]
+	for id in c.execute('''SELECT otherFilmid as idFilm, Correlation.correlation FROM Correlation WHERE thisFilmid = ? AND idFilm NOT IN (SELECT Copie.id_film FROM Location JOIN Copie ON Copie.id_copie = Location.id_copie WHERE Location.id_client = ?) ORDER BY Correlation.correlation LIMIT 3''', [film, client])
+	]
+	
+	c.execute('''SELECT avgcote FROM avgCote WHERE idFilm = ?''', film)
+	rateobj = c.fetchone()
+	if rateobj is not None:
+		rate = c.fetchone()[0]
+	else:
+		rate = 0
+	
+	return getFilmCorr(idfilm, rate)
+	
+	
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 run(app, host='localhost', port=8090)
